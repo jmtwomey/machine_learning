@@ -1,0 +1,98 @@
+def create_model(input_shape):
+    
+    dropRate = 0.25
+    
+    init = Input(input_shape)
+    x=  GaussianNoise(0.25)
+    x = BatchNormalization(axis=-1)(init)
+    x = Conv2D(8, (3, 3))(x)
+    x = ReLU()(x)
+    x = SpatialDropout2D(dropRate)(x)
+    x = BatchNormalization(axis=-1)(x)
+    x = Conv2D(8, (3, 3))(x)
+    x = ReLU()(x)
+    x = BatchNormalization(axis=-1)(x)
+    x = Conv2D(16, (3, 3))(x)
+    x = ReLU()(x)
+    x = BatchNormalization(axis=-1)(x)
+    x = MaxPooling2D(pool_size=(2, 2))(x)
+    x = Dropout(dropRate)(x)
+    x= ActivityRegularization()(x)
+    c1 = Conv2D(16, (3, 3), padding='same')(x)
+    c1 = ReLU()(c1)
+    c2 = Conv2D(16, (5, 5), padding='same')(x)
+    c2 = ReLU()(c2)
+    c3 = Conv2D(16, (7, 7), padding='same')(x)
+    c3 = ReLU()(c3)
+    c4 = Conv2D(16, (1, 1), padding='same')(x)
+    c4 = ReLU()(c4)
+    x = Concatenate()([c1, c2, c3, c4])
+    c1 = Conv2D(16, (3, 3), padding='same')(x)
+    c1 = ReLU()(c1)
+    c2 = Conv2D(16, (5, 5), padding='same')(x)
+    c2 = ReLU()(c2)
+    c3 = Conv2D(16, (7, 7), padding='same')(x)
+    c3 = ReLU()(c3)
+    c4 = Conv2D(16, (1, 1), padding='same')(x)
+    c4 = ReLU()(c4)
+    x = Concatenate()([c1, c2, c3, c4]) 
+    c1 = Conv2D(16, (3, 3), padding='same')(x)
+    c1 = ReLU()(c1)
+    c2 = Conv2D(16, (5, 5), padding='same')(x)
+    c2 = ReLU()(c2)
+    c3 = Conv2D(16, (7, 7), padding='same')(x)
+    c3 = ReLU()(c3)
+    c4 = Conv2D(16, (1, 1), padding='same')(x)
+    c4 = ReLU()(c4)
+    x = Concatenate()([c1, c2, c3, c4])
+    x = BatchNormalization(axis=-1)(x)
+    x = MaxPooling2D(pool_size=(2, 2))(x)
+    x = Dropout(dropRate)(x)
+    x = Conv2D(32, (3, 3))(x)
+    x = ReLU()(x)
+    x = BatchNormalization(axis=-1)(x)
+    x = MaxPooling2D(pool_size=(2, 2))(x)
+    x = Dropout(dropRate)(x)
+    x = Conv2D(64, (3, 3))(x)
+    x = ReLU()(x)
+    x = BatchNormalization(axis=-1)(x)
+    x = MaxPooling2D(pool_size=(2, 2))(x)
+    x = Dropout(dropRate)(x)
+    x = Conv2D(128, (3, 3))(x)
+    x = ReLU()(x)
+    x = BatchNormalization(axis=-1)(x)
+    x = MaxPooling2D(pool_size=(2, 2))(x)
+    x = Dropout(dropRate)(x)
+    x = Flatten()(x)
+    x = Dropout(0.5)(x)
+    x = Dense(28)(x)
+    x = ReLU()(x)
+    x = BatchNormalization(axis=-1)(x)
+    x = Dropout(0.1)(x)
+    x = Dense(28)(x)
+    x = Activation('sigmoid')(x)
+    
+    model = Model(init, x)
+    
+    return model
+
+
+model = create_model(SHAPE)
+model.summary()
+model.compile(
+    loss=['binary_crossentropy'],
+    optimizer=Adadelta(clipvalue=1),
+    metrics=['acc'])
+    
+epochs = 300    
+estop=EarlyStopping(monitor='val_loss', min_delta=0, patience=15, verbose=1, mode='auto', baseline=None)
+checkpoint = ModelCheckpoint('./base.model', monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='min', period=1)
+    
+hist = model.fit_generator(
+    tg,#from data generator
+    steps_per_epoch=len(tg),
+    validation_data=vg,
+    validation_steps=8,
+    epochs=epochs,
+    verbose=1,
+    callbacks=[checkpoint,estop])
