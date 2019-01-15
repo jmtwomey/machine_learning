@@ -1,0 +1,44 @@
+
+from sklearn.preprocessing import StandardScaler
+import numpy as np
+from mlxtend.feature_selection import SequentialFeatureSelector as SFS
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
+#sequential forward selection with mlextend
+
+
+def classopt(clf,param_grid,Xtr,ytr):
+#classifier, parameter grid, X train and y train
+
+#scaler=StandardScaler().fit(X) #normalization
+
+
+    sfs1=SFS(estimator=clf, #sequential forward selection
+             k_features='parsimonious',
+             forward=True,
+             floating=True,
+             verbose=0,
+             scoring='accuracy',
+             cv=3) #cross val
+    #sfs1.fit(X,y)
+    
+    pipe=Pipeline([
+    #        ('scaler',scaler),
+            ('sfs',sfs1),
+            ('rf',clf)
+            ])
+    
+
+    
+    gs=GridSearchCV(estimator=pipe,
+                    param_grid=param_grid,
+                    scoring='accuracy',
+                    n_jobs=1,
+                    cv=3,
+                    verbose=2,
+                    refit=True)
+    gs=gs.fit(X_tr,y_tr)
+    print(gs.best_params_)
+    print(gs.best_estimator_.steps[0][1].k_feature_idx_)
+    print(gs.best_score_)
+    return
