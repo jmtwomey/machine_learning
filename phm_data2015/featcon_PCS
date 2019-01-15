@@ -1,0 +1,87 @@
+ function [feat_vect_PCS,response_vect,time_vect]=featcon_PCS(MainData,PlantNum,Windows,IsForTraining)
+% feat_vect_PCS contains all the time domain features extracted from the most similar training plant, component and sensor tuple  
+% PlantNum is the number of the test plant  e.g. 41
+% This function creates features from the most similar [training Plant, Zone]
+% The most similar Plant, Zone tuple is saved in the "MainData"
+% MainData is a cell that contains the most similar tuples for each test plant
+%   rows of MainData are test plant numbers,
+%   and columns are 
+    % 1. [Plant,Component,Sensor]      
+    % 2. [Plant, Zone]  (The only data from the zone is instantaneous power)
+    % this code reads the 1st tuple only.
+%IsForTraining is true if this function is being called to train data. In
+%that case, it will perform feature construction for the most similar plant.
+%If not, it will perform extraction for the PlantNum
+
+if IsForTraining==true
+    Simtuple=MainData{PlantNum,2};% find the most similar training plant (SimPlant), component (SimComp) and sensor (SimSensor)
+else
+    Simtuple=MainData{PlantNum,1};% evaluate current plant (SimPlant), component (SimComp) and sensor (SimSensor)
+end
+SimPlant=Simtuple(1);
+SimComp=Simtuple(2);
+SimSensor=Simtuple(3);
+
+
+FileName = sprintf('NCombPlant%d.mat',SimPlant);
+
+% load('Zones'); %this file contains the number of zones for each plant.
+load (strcat('filepath'));
+%CombPlant=nanremove(CombPlant);
+% Length=min(size(CombPlant)); 
+% CompNum=(Length-7-ZoneNum)/8;
+
+column=1+8*(SimComp-1)+SimSensor;  % find the column associated with the most similar sensor
+
+%cut data columns
+timedays=NCombPlant(:,1); %convert to minutes
+timemin=timedays*1440;
+time=timemin-timemin(1); %zero intial time
+sensor=NCombPlant(:,column);
+[~,columns]=size(NCombPlant);
+
+
+
+%create time series object for interpolation
+ts=timeseries(sensor,time);
+ts=resample(ts,time);
+time=ts.Time;
+%time=time(2:length(time)-1); %remove first and last data points due to NaNs
+data=ts.Data;
+%data=data(2:length(data)-1);
+response=NCombPlant(Windows:length(data),columns-5:columns);
+
+
+
+inp=[time,data]; %change to correct variable name if needed
+
+%generate features
+meanfeat=featcon_time(inp,Windows,'mean');
+stdfeat=featcon_time(inp,Windows,'std');
+kurtfeat=featcon_time(inp,Windows,'kurtosis');
+skewfeat=featcon_time(inp,Windows,'skewness');
+rangefeat=featcon_time(inp,Windows,'range');
+iqrfeat=featcon_time(inp,Windows,'iqr');%inner quartile range
+maxfeat=featcon_time(inp,Windows,'max');
+minfeat=featcon_time(inp,Windows,'min');
+crestfeat=featcon_time(inp,Windows,'crest'); %crest factor
+rmsfeat=featcon_time(inp,Windows,'rms'); %root mean square
+peaksfeat=featcon_peaks(inp,Windows); %statistics relating to peaks (multiple; see featcon_peaks.m)
+meanderivfeat=featcon_time(inp,Windows,'meanderivative');
+acovfeat=featcon_time(inp,Windows,'autocovariance');%mean autocovariance detected
+mahalfeat=featcon_time(inp,Windows,'mahalanobis'); %mahalanobis distance from last point in sample to rest of the sample window
+mahalfeat(mahalfeat>150)=150;
+freqfeat=featcon_freq(inp,Windows); %calculates various frequency domain features (see featcon.freq.m)
+
+
+predictorvect=[meanfeat,stdfeat,kurtfeat,skewfeat,rangefeat,iqrfeat,maxfeat,minfeat,...
+    crestfeat,rmsfeat,peaksfeat,meanderivfeat,acovfeat,mahalfeat,freqfeat];%all predictor vectors joined and normalized by zscore
+
+predictorvect(isnan(predictorvect))=0; %zero out nan values
+predictorvect=zscore(predictorvect); %normalize
+
+%totalvect=horzcat(predictorvect,response);
+time_vect=(time+timemin(1))/1440;
+feat_vect_PCS=predictorvect;
+response_vect=response;
+end
