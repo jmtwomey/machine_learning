@@ -1,2 +1,2 @@
 # machine_learning
-Saved code snippets
+Useful saved code snippets for future use.
